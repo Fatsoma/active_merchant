@@ -86,6 +86,10 @@ module ActiveMerchant #:nodoc:
         commit(:authorization, post)
       end
       
+      def three_d_complete(pa_res, md)
+        commit(:three_d_complete, 'PARes' => pa_res, 'MD' => md)
+      end
+
       # You can only capture a transaction once, even if you didn't capture the full amount the first time.
       def capture(money, identification, options = {})
         post = {}
@@ -264,12 +268,20 @@ module ActiveMerchant #:nodoc:
       end
       
       def build_url(action)
-        endpoint = [ :purchase, :authorization ].include?(action) ? "vspdirect-register" : TRANSACTIONS[action].downcase
+        if action == :three_d_complete
+          endpoint = 'direct3dcallback'
+        else
+          endpoint = [ :purchase, :authorization ].include?(action) ? "vspdirect-register" : TRANSACTIONS[action].downcase
+        end
         "#{test? ? TEST_URL : LIVE_URL}/#{endpoint}.vsp"
       end
       
       def build_simulator_url(action)
-        endpoint = [ :purchase, :authorization ].include?(action) ? "VSPDirectGateway.asp" : "VSPServerGateway.asp?Service=Vendor#{TRANSACTIONS[action].capitalize}Tx"
+        if action == :three_d_complete
+          endpoint = 'VSPDirectCallback.asp'
+        elsif
+          endpoint = [ :purchase, :authorization ].include?(action) ? "VSPDirectGateway.asp" : "VSPServerGateway.asp?Service=Vendor#{TRANSACTIONS[action].capitalize}Tx"
+        end
         "#{SIMULATOR_URL}/#{endpoint}"
       end
 
