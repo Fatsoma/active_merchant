@@ -14,6 +14,13 @@ authorize_net:
   login: X
   password: Y
 
+# Working credentials, no need to replace
+balanced:
+  login: 'e1c5ad38d1c711e1b36c026ba7e239a9'
+
+banwire:
+  login: "desarrollo"
+
 barclays_epdq:
   login: test
   password: test
@@ -97,6 +104,11 @@ eway_managed:
   password: 'test123'
 
 # Working credentials, no need to replace
+eway_rapid:
+  login: "F9802CIVgUgNaD8y/H52MBMnL5OvMoy4cYimpi1L/dCXeNNR6or3vLPoC9GjeLVdA7ymi+"
+  password: "sandbox1"
+
+# Working credentials, no need to replace
 exact:
   login: "A00427-01"
   password: testus
@@ -111,6 +123,10 @@ federated_canada:
   password: password
 
 first_pay:
+  login:
+  password:
+
+firstdata_e4:
   login:
   password:
 
@@ -145,6 +161,10 @@ itransact:
 jetpay:
   login: TESTTERMINAL
 
+hdfc:
+  login: LOGIN
+  password: PASSWORD
+
 iridium:
     login: LOGIN
     password: PASSWORD
@@ -168,6 +188,11 @@ merchant_ware:
  login:
  password:
  name:
+
+# Working credentials, no need to replace
+mercury:
+  login: '595901'
+  password: 'xyz'
 
 metrics_global:
   login: 'demo'
@@ -220,6 +245,11 @@ netaxept:
 # Contact Netbilling for login info to the admin area
 netbilling:
   login: '104901072025'
+
+netpay:
+  store_id: 14
+  login: POS
+  password: plaza2020
 
 net_registry:
   login: X
@@ -299,6 +329,14 @@ plugnpay:
   login: LOGIN
   password: PASSWORD
 
+pxpay:
+  login: LOGIN
+  password: PASSWORD
+
+redsys:
+  login: MERCHANT CODE
+  secret_key: SECRET KEY
+
 sage_pay:
   login: LOGIN
 
@@ -377,8 +415,8 @@ quickpay:
 quickpay_with_api_key:
   login: 89898978
   password: "29p61DveBZ79c3144LW61lVz1qrwk2gfAFCxPyi5sn49m3Y3IRK5M6SN5d8a68u7"
-  apikey: "3WrEgfY995CnetPlp7R7XG6J5aq83K4k7B4Z3jsLd1vz53x1w6h42M81u7H62Sb4"
-  version: 4
+  apikey: "fB46983ZwR5dzy46A3r6ngDx7P37N5YTu1F4S9W2JKCs9v4t5L9m2Q8Mlbjpa2I1"
+  version: 6
 
 quantum:
   login: X
@@ -489,6 +527,12 @@ skipjack:
   login: X
   password: Y
 
+# Working credentials, no need to replace
+spreedly_core:
+  login: "4Y9bVkOCpYesPQOfDi7TXQyUw50"
+  password: "Y2i7AjgU03SUjwY4xnOPqzdsv4dMbPDCQzorAk8Bcoy0U8EIVE4innGjuoMQv7MN"
+  gateway_token: "3gLeg4726V5P0HK7cq7QzHsL0a6"
+
 stripe:
   login:
 
@@ -532,6 +576,9 @@ viaklix:
 vindicia:
   login: LOGIN
   password: PASSWORD
+
+webpay:
+  login: "vtUQeOtUnYr7PGCLQ96Ul4zqpDUO4sOE"
 
 # Working test credentials, no need to replace
 wirecard:

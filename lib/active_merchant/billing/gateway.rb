@@ -62,7 +62,7 @@ module ActiveMerchant #:nodoc:
       include Utils
 
       DEBIT_CARDS = [ :switch, :solo ]
-      CURRENCIES_WITHOUT_FRACTIONS = [ 'JPY' ]
+      CURRENCIES_WITHOUT_FRACTIONS = [ 'JPY', 'HUF' ]
       CREDIT_DEPRECATION_MESSAGE = "Support for using credit to refund existing transactions is deprecated and will be removed from a future release of ActiveMerchant. Please use the refund method instead."
 
       cattr_reader :implementations
@@ -93,6 +93,12 @@ module ActiveMerchant #:nodoc:
       class_attribute :homepage_url
       class_attribute :display_name
 
+      class_attribute :test_url, :live_url
+
+      class_attribute :abstract_class
+
+      self.abstract_class = false
+
       # The application making the calls to the gateway
       # Useful for things like the PayPal build notation (BN) id fields
       superclass_delegating_accessor :application_id
@@ -119,11 +125,12 @@ module ActiveMerchant #:nodoc:
       # See the documentation for the gateway you will be using to make sure there are no other
       # required options.
       def initialize(options = {})
+        @options = options
       end
 
       # Are we running in test mode?
       def test?
-        Base.gateway_mode == :test
+        (@options[:test] || Base.test?)
       end
 
       private # :nodoc: all

@@ -1,5 +1,3 @@
-require 'LitleOnline'
-
 module ActiveMerchant #:nodoc:
   module Billing #:nodoc:
     class LitleGateway < Gateway
@@ -36,8 +34,8 @@ module ActiveMerchant #:nodoc:
       # * <tt>:zip</tt> - The zip or postal code of the customer.
       # * <tt>:phone</tt> - The phone number of the customer.
 
-      TEST_URL = 'https://www.testlitle.com/sandbox/communicator/online'
-      LIVE_URL = 'https://payments.litle.com/vap/communicator/online'
+      self.test_url = 'https://www.testlitle.com/sandbox/communicator/online'
+      self.live_url = 'https://payments.litle.com/vap/communicator/online'
 
       LITLE_SCHEMA_VERSION = '8.10'
 
@@ -56,6 +54,12 @@ module ActiveMerchant #:nodoc:
       self.default_currency = 'USD'
 
       def initialize(options = {})
+        begin
+          require 'LitleOnline'
+        rescue LoadError
+          raise "Could not load the LitleOnline gem (>= 08.13.2).  Use `gem install LitleOnline` to install it."
+        end
+
         @litle = LitleOnline::LitleOnlineRequest.new
 
         options[:version]  ||= LITLE_SCHEMA_VERSION
@@ -64,16 +68,16 @@ module ActiveMerchant #:nodoc:
 
         requires!(options, :merchant_id, :user, :password, :merchant, :version)
 
-        @options = options
+        super
       end
 
-      def authorize(money, creditcard, options = {})
-        to_pass = create_credit_card_hash(money, creditcard, options)
+      def authorize(money, creditcard_or_token, options = {})
+        to_pass = build_authorize_request(money, creditcard_or_token, options)
         build_response(:authorization, @litle.authorization(to_pass))
       end
 
-      def purchase(money, creditcard, options = {})
-        to_pass = create_credit_card_hash(money, creditcard, options)
+      def purchase(money, creditcard_or_token, options = {})
+        to_pass = build_purchase_request(money, creditcard_or_token, options)
         build_response(:sale, @litle.sale(to_pass))
       end
 
@@ -94,7 +98,7 @@ module ActiveMerchant #:nodoc:
 
       def store(creditcard, options = {})
         to_pass = create_token_hash(creditcard, options)
-        build_response(:registerToken, @litle.register_token_request(to_pass), %w(801 802))
+        build_response(:registerToken, @litle.register_token_request(to_pass), %w(000 801 802))
       end
 
       private
@@ -129,7 +133,7 @@ module ActiveMerchant #:nodoc:
       def url
         return @options[:url] if @options[:url].present?
 
-        test? ? TEST_URL : LIVE_URL
+        test? ? self.test_url : self.live_url
       end
 
       def build_response(kind, litle_response, valid_responses=%w(000))
@@ -138,40 +142,72 @@ module ActiveMerchant #:nodoc:
         if response['response'] == "0"
           detail = response["#{kind}Response"]
           fraud = fraud_result(detail)
+          authorization = case kind
+          when :registerToken
+            response['registerTokenResponse']['litleToken']
+          else
+            detail['litleTxnId']
+          end
           Response.new(
             valid_responses.include?(detail['response']),
             detail['message'],
             {:litleOnlineResponse => response},
-            :authorization => detail['litleTxnId'],
+            :authorization => authorization,
             :avs_result => {:code => fraud['avs']},
-            :cvv_result => fraud['cvv']
+            :cvv_result => fraud['cvv'],
+            :test => test?
           )
         else
-          Response.new(false, response['message'], :litleOnlineResponse => response)
+          Response.new(false, response['message'], :litleOnlineResponse => response, :test => test?)
         end
       end
 
-      def create_credit_card_hash(money, creditcard, options)
-        cc_type = CARD_TYPE[creditcard.brand]
+      def build_authorize_request(money, creditcard_or_token, options)
+        hash = create_hash(money, options)
 
-        exp_date_yr = creditcard.year.to_s()[2..3]
+        add_credit_card_or_token_hash(hash, creditcard_or_token)
 
-        if( creditcard.month.to_s().length == 1 )
-          exp_date_mo = '0' + creditcard.month.to_s()
+        hash
+      end
+
+      def build_purchase_request(money, creditcard_or_token, options)
+        hash = create_hash(money, options)
+
+        add_credit_card_or_token_hash(hash, creditcard_or_token)
+
+        hash
+      end
+
+      def add_credit_card_or_token_hash(hash, creditcard_or_token)
+        if creditcard_or_token.is_a?(String)
+          add_token_hash(hash, creditcard_or_token)
         else
-          exp_date_mo = creditcard.month.to_s()
+          add_credit_card_hash(hash, creditcard_or_token)
         end
+      end
 
-        exp_date = exp_date_mo + exp_date_yr
-
-        card_info = {
-          'type' => cc_type,
-          'number' => creditcard.number,
-          'expDate' => exp_date,
-          'cardValidationNum' => creditcard.verification_value
+      def add_token_hash(hash, creditcard_or_token)
+        token_info = {
+            'litleToken' => creditcard_or_token
         }
 
-        hash = create_hash(money, options)
+        hash['token'] = token_info
+        hash
+      end
+
+      def add_credit_card_hash(hash, creditcard)
+        cc_type     = CARD_TYPE[creditcard.brand]
+        exp_date_yr = creditcard.year.to_s[2..3]
+        exp_date_mo = '%02d' % creditcard.month.to_i
+        exp_date    = exp_date_mo + exp_date_yr
+
+        card_info = {
+            'type'              => cc_type,
+            'number'            => creditcard.number,
+            'expDate'           => exp_date,
+            'cardValidationNum' => creditcard.verification_value
+        }
+
         hash['card'] = card_info
         hash
       end

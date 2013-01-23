@@ -1,7 +1,7 @@
 module ActiveMerchant
   module Billing
     class PaywayGateway < Gateway
-      URL = 'https://ccapi.client.qvalent.com/payway/ccapi'
+      self.live_url = self.test_url = 'https://ccapi.client.qvalent.com/payway/ccapi'
 
       self.supported_countries = [ 'AU' ]
       self.supported_cardtypes = [ :visa, :master, :diners_club, :american_express, :bankcard ]
@@ -86,13 +86,10 @@ module ActiveMerchant
       def initialize(options={})
         @options = options
 
-        options[:merchant] ||= 'TEST' if test?
-
+        @options[:merchant] ||= 'TEST' if test?
         requires!(options, :username, :password, :merchant, :pem)
 
-        @options[:eci]      ||= 'SSL'
-
-        super
+        @options[:eci] ||= 'SSL'
       end
 
       def authorize(amount, payment_method, options={})
@@ -136,6 +133,7 @@ module ActiveMerchant
 
         post = {}
         add_payment_method(post, credit_card)
+        add_payment_method(post, options[:billing_id])
         commit(:store, post)
       end
 
@@ -182,7 +180,7 @@ module ActiveMerchant
         post.merge!('order.type' => TRANSACTIONS[action])
 
         request = post.map { |k, v| "#{k}=#{CGI.escape(v.to_s)}" }.join("&")
-        response = ssl_post(URL, request)
+        response = ssl_post(self.live_url, request)
 
         params = {}
         CGI.parse(response).each_pair do |key, value|
@@ -203,10 +201,6 @@ module ActiveMerchant
         return Response.new(false, "Invalid credentials", {}, :test => test?)
       rescue ActiveMerchant::ClientCertificateError
         return Response.new(false, "Invalid certificate", {}, :test => test?)
-      end
-
-      def test?
-        (@options[:test] || super)
       end
     end
   end

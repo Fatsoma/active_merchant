@@ -4,10 +4,10 @@ module ActiveMerchant #:nodoc:
   module Billing #:nodoc:
     class WirecardGateway < Gateway
       # Test server location
-      TEST_URL = 'https://c3-test.wirecard.com/secure/ssl-gateway'
+      self.test_url = 'https://c3-test.wirecard.com/secure/ssl-gateway'
 
       # Live server location
-      LIVE_URL = 'https://c3.wirecard.com/secure/ssl-gateway'
+      self.live_url = 'https://c3.wirecard.com/secure/ssl-gateway'
 
       # The Namespaces are not really needed, because it just tells the System, that there's actually no namespace used.
       # It's just specified here for completeness.
@@ -57,13 +57,7 @@ module ActiveMerchant #:nodoc:
         requires!(options, :login, :password)
         # unfortunately Wirecard also requires a BusinessCaseSignature in the XML request
         requires!(options, :signature)
-        @options = options
         super
-      end
-
-      # Should run against the test servers or not?
-      def test?
-        @options[:test] || super
       end
 
       # Authorization
@@ -109,11 +103,11 @@ module ActiveMerchant #:nodoc:
         headers = { 'Content-Type' => 'text/xml',
                     'Authorization' => encoded_credentials }
 
-        response = parse(ssl_post(test? ? TEST_URL : LIVE_URL, request, headers))
+        response = parse(ssl_post(test? ? self.test_url : self.live_url, request, headers))
         # Pending Status also means Acknowledged (as stated in their specification)
         success = response[:FunctionResult] == "ACK" || response[:FunctionResult] == "PENDING"
         message = response[:Message]
-        authorization = (success && action == :authorization) ? response[:GuWID] : nil
+        authorization = response[:GuWID]
 
         Response.new(success, message, response,
           :test => test?,
@@ -154,7 +148,7 @@ module ActiveMerchant #:nodoc:
         options[:order_id] ||= generate_unique_id
 
         xml.tag! "FNC_CC_#{options[:action].to_s.upcase}" do
-          xml.tag! 'FunctionID', options[:description]
+          xml.tag! 'FunctionID', options[:description].to_s.slice(0,32)
           xml.tag! 'CC_TRANSACTION' do
             xml.tag! 'TransactionID', options[:order_id]
             case options[:action]

@@ -13,6 +13,7 @@ module ActiveMerchant #:nodoc:
     # names.
     #
     # Important Notes
+    # * For checks you can purchase and store.
     # * AVS and CVV only work against the production server.  You will always
     #   get back X for AVS and no response for CVV against the test server.
     # * Nexus is the list of states or provinces where you have a physical
@@ -24,8 +25,8 @@ module ActiveMerchant #:nodoc:
     #   calculating tax/VAT.
     # * All transactions use dollar values.
     class CyberSourceGateway < Gateway
-      TEST_URL = 'https://ics2wstest.ic3.com/commerce/1.x/transactionProcessor'
-      LIVE_URL = 'https://ics2ws.ic3.com/commerce/1.x/transactionProcessor'
+      self.test_url = 'https://ics2wstest.ic3.com/commerce/1.x/transactionProcessor'
+      self.live_url = 'https://ics2ws.ic3.com/commerce/1.x/transactionProcessor'
 
       XSD_VERSION = "1.69"
 
@@ -107,13 +108,7 @@ module ActiveMerchant #:nodoc:
       #                       if CVV would have failed
       def initialize(options = {})
         requires!(options, :login, :password)
-        @options = options
         super
-      end
-
-      # Should run against the test servers or not?
-      def test?
-        @options[:test] || Base.gateway_mode == :test
       end
 
       # Request an authorization for an amount from CyberSource
@@ -137,10 +132,10 @@ module ActiveMerchant #:nodoc:
 
       # Purchase is an auth followed by a capture
       # You must supply an order_id in the options hash
-      def purchase(money, creditcard_or_reference, options = {})
+      def purchase(money, payment_method_or_reference, options = {})
         requires!(options, :order_id)
         setup_address_hash(options)
-        commit(build_purchase_request(money, creditcard_or_reference, options), options)
+        commit(build_purchase_request(money, payment_method_or_reference, options), options)
       end
 
       def void(identification, options = {})
@@ -148,21 +143,22 @@ module ActiveMerchant #:nodoc:
       end
 
       def refund(money, identification, options = {})
-        commit(build_credit_request(money, identification, options), options)
+        commit(build_refund_request(money, identification, options), options)
       end
 
-      def credit(money, identification, options = {})
-        deprecated CREDIT_DEPRECATION_MESSAGE
-        refund(money, identification, options)
+      # Adds credit to a subscription (stand alone credit).
+      def credit(money, reference, options = {})
+        requires!(options, :order_id)
+        commit(build_credit_request(money, reference, options), options)
       end
 
       # Stores a customer subscription/profile with type "on-demand".
       # To charge the card while creating a profile, pass
       # options[:setup_fee] => money
-      def store(creditcard, options = {})
+      def store(payment_method, options = {})
         requires!(options, :order_id)
         setup_address_hash(options)
-        commit(build_create_subscription_request(creditcard, options), options)
+        commit(build_create_subscription_request(payment_method, options), options)
       end
 
       # Updates a customer subscription/profile
@@ -227,7 +223,7 @@ module ActiveMerchant #:nodoc:
 
       def build_auth_request(money, creditcard_or_reference, options)
         xml = Builder::XmlMarkup.new :indent => 2
-        add_creditcard_or_subscription(xml, money, creditcard_or_reference, options)
+        add_payment_method_or_subscription(xml, money, creditcard_or_reference, options)
         add_auth_service(xml)
         add_business_rules_data(xml)
         xml.target!
@@ -255,11 +251,15 @@ module ActiveMerchant #:nodoc:
         xml.target!
       end
 
-      def build_purchase_request(money, creditcard_or_reference, options)
+      def build_purchase_request(money, payment_method_or_reference, options)
         xml = Builder::XmlMarkup.new :indent => 2
-        add_creditcard_or_subscription(xml, money, creditcard_or_reference, options)
-        add_purchase_service(xml, options)
-        add_business_rules_data(xml)
+        add_payment_method_or_subscription(xml, money, payment_method_or_reference, options)
+        if(payment_method_or_reference.respond_to?(:check?) && payment_method_or_reference.check?)
+          add_check_service(xml)
+        else
+          add_purchase_service(xml, options)
+          add_business_rules_data(xml)
+        end
         xml.target!
       end
 
@@ -281,7 +281,7 @@ module ActiveMerchant #:nodoc:
         xml.target!
       end
 
-      def build_credit_request(money, identification, options)
+      def build_refund_request(money, identification, options)
         order_id, request_id, request_token = identification.split(";")
         options[:order_id] = order_id
 
@@ -292,16 +292,32 @@ module ActiveMerchant #:nodoc:
         xml.target!
       end
 
-      def build_create_subscription_request(creditcard, options)
+      def build_credit_request(money, reference, options)
+        xml = Builder::XmlMarkup.new :indent => 2
+
+        add_purchase_data(xml, money, true, options)
+        add_subscription(xml, options, reference)
+        add_credit_service(xml)
+
+        xml.target!
+      end
+
+      def build_create_subscription_request(payment_method, options)
         options[:subscription] = (options[:subscription] || {}).merge(:frequency => "on-demand", :amount => 0, :automatic_renew => false)
 
         xml = Builder::XmlMarkup.new :indent => 2
-        add_address(xml, creditcard, options[:billing_address], options)
+        add_address(xml, payment_method, options[:billing_address], options)
         add_purchase_data(xml, options[:setup_fee] || 0, true, options)
-        add_creditcard(xml, creditcard)
-        add_creditcard_payment_method(xml)
+        if payment_method.check?
+          add_check(xml, payment_method)
+          add_check_payment_method(xml)
+          add_check_service(xml, options) if options[:setup_fee]
+        else
+          add_creditcard(xml, payment_method)
+          add_creditcard_payment_method(xml)
+          add_purchase_service(xml, options) if options[:setup_fee]
+        end
         add_subscription(xml, options)
-        add_purchase_service(xml, options) if options[:setup_fee]
         add_subscription_create_service(xml, options)
         add_business_rules_data(xml)
         xml.target!
@@ -367,12 +383,12 @@ module ActiveMerchant #:nodoc:
         end
       end
 
-      def add_address(xml, creditcard, address, options, shipTo = false)
+      def add_address(xml, payment_method, address, options, shipTo = false)
         requires!(options, :email)
 
         xml.tag! shipTo ? 'shipTo' : 'billTo' do
-          xml.tag! 'firstName',             creditcard.first_name             if creditcard
-          xml.tag! 'lastName',              creditcard.last_name              if creditcard
+          xml.tag! 'firstName',             payment_method.first_name             if payment_method
+          xml.tag! 'lastName',              payment_method.last_name              if payment_method
           xml.tag! 'street1',               address[:address1]
           xml.tag! 'street2',               address[:address2]                unless address[:address2].blank?
           xml.tag! 'city',                  address[:city]
@@ -395,6 +411,14 @@ module ActiveMerchant #:nodoc:
           xml.tag! 'expirationYear', format(creditcard.year, :four_digits)
           xml.tag!('cvNumber', creditcard.verification_value) unless (@options[:ignore_cvv] || creditcard.verification_value.blank? )
           xml.tag! 'cardType', @@credit_card_codes[card_brand(creditcard).to_sym]
+        end
+      end
+
+      def add_check(xml, check)
+        xml.tag! 'check' do
+          xml.tag! 'accountNumber', check.account_number
+          xml.tag! 'accountType', check.account_type[0]
+          xml.tag! 'bankTransitNumber', check.routing_number
         end
       end
 
@@ -435,11 +459,15 @@ module ActiveMerchant #:nodoc:
         end
       end
 
-      def add_credit_service(xml, request_id, request_token)
+      def add_credit_service(xml, request_id = nil, request_token = nil)
         xml.tag! 'ccCreditService', {'run' => 'true'} do
-          xml.tag! 'captureRequestID', request_id
-          xml.tag! 'captureRequestToken', request_token
+          xml.tag! 'captureRequestID', request_id if request_id
+          xml.tag! 'captureRequestToken', request_token if request_token
         end
+      end
+
+      def add_check_service(xml)
+        xml.tag! 'ecDebitService', {'run' => 'true'}
       end
 
       def add_subscription_create_service(xml, options)
@@ -486,14 +514,24 @@ module ActiveMerchant #:nodoc:
         end
       end
 
-      def add_creditcard_or_subscription(xml, money, creditcard_or_reference, options)
-        if creditcard_or_reference.is_a?(String)
+      def add_check_payment_method(xml)
+        xml.tag! 'subscription' do
+          xml.tag! 'paymentMethod', "check"
+        end
+      end
+
+      def add_payment_method_or_subscription(xml, money, payment_method_or_reference, options)
+        if payment_method_or_reference.is_a?(String)
           add_purchase_data(xml, money, true, options)
-          add_subscription(xml, options, creditcard_or_reference)
+          add_subscription(xml, options, payment_method_or_reference)
+        elsif payment_method_or_reference.check?
+          add_address(xml, payment_method_or_reference, options[:billing_address], options)
+          add_purchase_data(xml, money, true, options)
+          add_check(xml, payment_method_or_reference)
         else
-          add_address(xml, creditcard_or_reference, options[:billing_address], options)
+          add_address(xml, payment_method_or_reference, options[:billing_address], options)
           add_purchase_data(xml, money, true, options)
-          add_creditcard(xml, creditcard_or_reference)
+          add_creditcard(xml, payment_method_or_reference)
         end
       end
 
@@ -523,7 +561,7 @@ module ActiveMerchant #:nodoc:
       # Contact CyberSource, make the SOAP request, and parse the reply into a
       # Response object
       def commit(request, options)
-        response = parse(ssl_post(test? ? TEST_URL : LIVE_URL, build_request(request, options)))
+        response = parse(ssl_post(test? ? self.test_url : self.live_url, build_request(request, options)))
 
         success = response[:decision] == "ACCEPT"
         message = @@response_codes[('r' + response[:reasonCode]).to_sym] rescue response[:message]

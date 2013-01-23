@@ -1,8 +1,8 @@
 module ActiveMerchant #:nodoc:
   module Billing #:nodoc:
     class OptimalPaymentGateway < Gateway
-      TEST_URL = 'https://webservices.test.optimalpayments.com/creditcardWS/CreditCardServlet/v1'
-      LIVE_URL = 'https://webservices.optimalpayments.com/creditcardWS/CreditCardServlet/v1'
+      self.test_url = 'https://webservices.test.optimalpayments.com/creditcardWS/CreditCardServlet/v1'
+      self.live_url = 'https://webservices.optimalpayments.com/creditcardWS/CreditCardServlet/v1'
 
       # The countries the gateway supports merchants from as 2 digit ISO country codes
       self.supported_countries = ['CA', 'US', 'GB']
@@ -18,7 +18,6 @@ module ActiveMerchant #:nodoc:
 
       def initialize(options = {})
         #requires!(options, :login, :password)
-        @options = options
         super
       end
 
@@ -49,11 +48,7 @@ module ActiveMerchant #:nodoc:
         commit('ccSettlement', money, options)
       end
 
-      def test?
-        super || @options[:test]
-      end
-
-    private
+      private
 
       def parse_card_or_auth(card_or_auth, options)
         if card_or_auth.respond_to?(:number)
@@ -91,11 +86,13 @@ module ActiveMerchant #:nodoc:
           raise 'Unknown Action'
         end
         txnRequest = URI.encode(xml)
-        response = parse(ssl_post(test? ? TEST_URL : LIVE_URL, "txnMode=#{action}&txnRequest=#{txnRequest}"))
+        response = parse(ssl_post(test? ? self.test_url : self.live_url, "txnMode=#{action}&txnRequest=#{txnRequest}"))
 
         Response.new(successful?(response), message_from(response), hash_from_xml(response),
           :test          => test?,
-          :authorization => authorization_from(response)
+          :authorization => authorization_from(response),
+          :avs_result => { :code => avs_result_from(response) },
+          :cvv_result => cvv_result_from(response)
         )
       end
 
@@ -113,7 +110,15 @@ module ActiveMerchant #:nodoc:
       end
 
       def authorization_from(response)
-        REXML::XPath.first(response, '//confirmationNumber').text rescue nil
+        get_text_from_document(response, '//confirmationNumber')
+      end
+
+      def avs_result_from(response)
+        get_text_from_document(response, '//avsResponse')
+      end
+
+      def cvv_result_from(response)
+        get_text_from_document(response, '//cvdResponse')
       end
 
       def hash_from_xml(response)
@@ -141,6 +146,11 @@ module ActiveMerchant #:nodoc:
           yield xml
         end
         xml.target!
+      end
+
+      def get_text_from_document(document, node)
+        node = REXML::XPath.first(document, node)
+        node && node.text
       end
 
       def cc_auth_request(money, opts)

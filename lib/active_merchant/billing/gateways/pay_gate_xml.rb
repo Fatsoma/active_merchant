@@ -73,7 +73,7 @@ module ActiveMerchant #:nodoc:
     # threed     - must remain blank unless you are using your own 3D Secure server
     #
     class PayGateXmlGateway < Gateway
-      LIVE_URL = 'https://www.paygate.co.za/payxml/process.trans'
+      self.live_url = 'https://www.paygate.co.za/payxml/process.trans'
 
       # The countries the gateway supports merchants from as 2 digit ISO country codes
       self.supported_countries = ['US', 'ZA']
@@ -157,12 +157,11 @@ module ActiveMerchant #:nodoc:
 
       def initialize(options = {})
         requires!(options, :login, :password)
-        @options = options
         super
       end
 
       def purchase(money, creditcard, options = {})
-        MultiResponse.new.tap do |r|
+        MultiResponse.run do |r|
           r.process{authorize(money, creditcard, options)}
           r.process{capture(money, r.authorization, options)}
         end
@@ -180,10 +179,6 @@ module ActiveMerchant #:nodoc:
 
         options.merge!(:money => money, :authorization => authorization)
         commit(action, build_request(action, options))
-      end
-
-      def test?
-        @options[:test] || (Base.gateway_mode == :test)
       end
 
       private
@@ -250,7 +245,7 @@ module ActiveMerchant #:nodoc:
       end
 
       def commit(action, request)
-        response = parse(action, ssl_post(LIVE_URL, request))
+        response = parse(action, ssl_post(self.live_url, request))
         Response.new(successful?(response), message_from(response), response,
           :test           => test?,
           :authorization  => response[:tid]
