@@ -280,12 +280,21 @@ module ActiveMerchant #:nodoc:
         REXML::XPath.first(soap.root, '//password').text = @password
       end
 
-      def fill_cardholder(soap, options)
+      def fill_three_d_params(soap, pa_res, transaction_id)
+        REXML::XPath.first(soap.root, '//transactionID').text = transaction_id
+        REXML::XPath.first(soap.root, '//paRES').text = pa_res
+      end
+
+      def fill_cardholder(soap, card, options)
         ch_info = options[:billing_address] || options[:address]
-        ch_info = ch_info || {:address1 => '', :address2 => ''}
+
+
         REXML::XPath.first(soap.root, '//customerIP').text = options[:ip]
-        REXML::XPath.first(soap.root, '//cardHolderName').text = ch_info[:name]
-        REXML::XPath.first(soap.root, '//cardHolderAddress').text = ch_info[:address1] + ' ' + ch_info[:address2]
+        name = card.name || ch_info[:name]
+        REXML::XPath.first(soap.root, '//cardHolderName').text = name if name
+        address = ch_info[:address1] || ''
+        address << ch_info[:address2] if ch_info[:address2]
+        REXML::XPath.first(soap.root, '//cardHolderAddress').text = address
         REXML::XPath.first(soap.root, '//cardHolderZipcode').text = ch_info[:zip]
         REXML::XPath.first(soap.root, '//cardHolderCity').text = ch_info[:city]
         REXML::XPath.first(soap.root, '//cardHolderState').text = ch_info[:state]
