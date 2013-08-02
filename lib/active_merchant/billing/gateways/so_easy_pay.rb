@@ -103,7 +103,7 @@ module ActiveMerchant #:nodoc:
 </soap:Envelope>')
         fill_credentials(soap, options)
         fill_order_info(soap, options.merge({:amount => amount(money), :currency => (options[:currency] || currency(money))}))
-        fill_cardholder(soap, options)
+        fill_cardholder(soap, card, options)
         fill_card(soap, card)
         return soap
       end
@@ -152,7 +152,7 @@ module ActiveMerchant #:nodoc:
 </soap:Envelope>')
         fill_credentials(soap, options)
         fill_order_info(soap, options.merge({:amount => amount(money), :currency => (options[:currency] || currency(money))}))
-        fill_cardholder(soap, options)
+        fill_cardholder(soap, card, options)
         fill_card(soap, card)
         return soap
       end
