@@ -157,6 +157,27 @@ module ActiveMerchant #:nodoc:
         return soap
       end
 
+      def do_three_d_confirm(pa_res, transaction_id, options)
+        options.merge!({:soap_action => 'S3DConfirm'})
+        soap = REXML::Document.new('<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" xmlns:tns="urn:Interface" xmlns:types="urn:Interface/encodedTypes" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body soap:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+    <tns:S3DConfirm>
+      <S3DConfirmRequest href="#id1" />
+    </tns:S3DConfirm>
+    <tns:S3DConfirmRequest id="id1" xsi:type="tns:S3DConfirmRequest">
+      <websiteID xsi:type="xsd:string"></websiteID>
+      <password xsi:type="xsd:string"></password>
+      <transactionID xsi:type="xsd:string"></transactionID>
+      <paRES xsi:type="xsd:string"></paRES>
+    </tns:S3DConfirmRequest>
+  </soap:Body>
+</soap:Envelope>')
+        fill_credentials(soap, options)
+        fill_three_d_params(soap, pa_res, transaction_id)
+        return soap
+      end
+
       def do_reauthorization(money, authorization, options)
         options.merge!({:soap_action => 'ReauthorizeTransaction'})
         soap = REXML::Document.new('<?xml version="1.0" encoding="utf-8"?>
@@ -320,7 +341,7 @@ module ActiveMerchant #:nodoc:
         REXML::XPath.first(soap.root, '//amount').text = options[:amount]
         node = REXML::XPath.first(soap.root, '//currency')
 
-        if node 
+        if node
           node.text = options[:currency]
         end
       end
