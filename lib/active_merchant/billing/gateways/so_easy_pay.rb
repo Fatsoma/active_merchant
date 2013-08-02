@@ -369,18 +369,18 @@ module ActiveMerchant #:nodoc:
 
       def commit(soap, options)
         requires!(options, :soap_action)
+        soap_action = options[:soap_action]
         xml = ""
       	REXML::Formatters::Default.new().write(soap.root, xml)
-        headers = {"SOAPAction" => "\"urn:Interface##{options[:soap_action]}\"",
+        headers = {"SOAPAction" => "\"urn:Interface##{soap_action}\"",
                    "Content-Type" => "text/xml; charset=utf-8"}
-        response = parse(ssl_post(test? ? self.test_url : self.live_url, xml,
-                                headers))
-        return Response.new(response[:error_code] == '000', response[:error_message], response,
-          :test => test?,
-          :authorization => response[:transaction_id])
-      end
-
-      def post_data(action, parameters = {})
+        response_string = ssl_post(test? ? self.test_url : self.live_url, xml, headers)
+        response = parse(response_string, soap_action)
+        return Response.new(response['errorcode'] == '000',
+                            response['errormessage'],
+                            response,
+                            :test => test?,
+                            :authorization => response['transaction_id'])
       end
     end
   end
