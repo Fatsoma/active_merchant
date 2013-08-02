@@ -41,6 +41,10 @@ module ActiveMerchant #:nodoc:
         end
       end
 
+      def three_d_complete(pa_res, transaction_id, options = {})
+        commit(do_three_d_confirm(pa_res, transaction_id, options), options)
+      end
+
       def capture(money, authorization, options = {})
         commit(do_capture(money, authorization, options), options)
       end
