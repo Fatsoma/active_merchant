@@ -355,6 +355,16 @@ module ActiveMerchant #:nodoc:
         end
         result
       end
+
+      def get_element_value(document, element_name)
+        node = REXML::XPath.first(document.root, "//#{element_name}")
+        node.text if node
+      end
+
+      def set_element_value(document, element_name, value)
+        return unless value.present?
+        node = REXML::XPath.first(document.root, "//#{element_name}")
+        node.text = value if node
       end
 
       def commit(soap, options)
