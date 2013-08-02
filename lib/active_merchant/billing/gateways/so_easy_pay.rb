@@ -316,13 +316,15 @@ module ActiveMerchant #:nodoc:
         end
       end
 
-      def parse(response)
-        retval = {}
-        soap = REXML::Document.new(response)
-        retval[:transaction_id] = REXML::XPath.first(soap.root, '//transactionID').text
-        retval[:error_code] = REXML::XPath.first(soap.root, '//errorcode').text
-        retval[:error_message] = REXML::XPath.first(soap.root, '//errormessage').text
-        return retval
+      def parse(response, action)
+        result = {}
+        document = REXML::Document.new(response)
+        response_element = document.root.get_elements("//[@xsi:type='tns:#{action}Response']").first
+        response_element.elements.each do |element|
+          result[element.name.underscore] = element.text
+        end
+        result
+      end
       end
 
       def commit(soap, options)
