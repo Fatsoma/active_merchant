@@ -24,15 +24,15 @@ module ActiveMerchant #:nodoc:
         super
       end
 
-      def authorize(money, payment_source, options = {})        
+      def authorize(money, payment_source, options = {})
 
         if payment_source.respond_to?(:number)
           commit(do_authorization(money, payment_source, options), options)
-        else 
+        else
           commit(do_reauthorization(money, payment_source, options), options)
         end
       end
-      
+
       def purchase(money, payment_source, options = {})
         if payment_source.respond_to?(:number)
           commit(do_sale(money, payment_source, options), options)
